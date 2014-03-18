@@ -52,6 +52,9 @@ describe('ActiveResource', function() {
     backend.whenGET('http://api.faculty.com/systems/?placement=window')
       .respond([{id: 6, placement: 'window'}, {id: 7, placement: 'window'}]);
 
+    backend.whenGET('http://api.facult.com/systems')
+      .response({limit: 2, offset: 0, data:[{id: 8, placement: 'door'}, {id: 9, placement: 'window'}]});
+
     // POST SYSTEM
     // Responses for POST requests to create new systems
     backend.whenPOST('http://api.faculty.com/systems', {placement: 'window', name: 'Bretts System', sensors: []})

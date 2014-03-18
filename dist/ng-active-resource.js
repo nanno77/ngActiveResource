@@ -1230,7 +1230,7 @@ angular.module('ActiveResource').provider('ARGET', function () {
       function appendSlashForQueryString(url) {
         if (url.slice(-1) == '/')
           return url;
-        return url + '/';
+        return url;
       }
       ;
       return function generateGET(instance, url, terms, options) {
@@ -1679,11 +1679,16 @@ angular.module('ActiveResource').provider('ARBase', function () {
           // Normalize variables
           if (typeof terms != 'object')
             throw 'Argument to where must be an object';
+          
+          defaults = {
+            lazy: false,
+            overEager: false
+          };
           if (!options)
-            options = {
-              lazy: false,
-              overEager: false
-            };
+            options = defaults;
+          else
+            options = _.merge(defaults, options);
+          
           var cached = _this.cached.where(terms);
           options.cached = cached;
           options.multi = true;
@@ -1692,6 +1697,8 @@ angular.module('ActiveResource').provider('ARBase', function () {
           // into the appropriate class, and return the found collection
           return GET(_this, url, terms, options).then(function (json) {
             var results = [];
+            if (options.key)
+              json = json[options.key];
             for (var i in json) {
               var instance = _this.new(json[i]);
               results.push(instance);
