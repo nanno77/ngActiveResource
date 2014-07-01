@@ -819,6 +819,16 @@ angular.module('ActiveResource').provider('ARCache', function () {
           return !!!Object.keys(this).length;
         }
       });
+      // function length()
+      //
+      // Length of cache, since cache is object so it has no length
+      // property by default
+      Object.defineProperty(this, 'length', {
+        enumerable: false,
+        value: function () {
+          return Object.keys(this).length;
+        }
+      });
       // function where(terms)
       //
       // @param {terms} - Search terms used to find instances in the cache
@@ -1050,13 +1060,6 @@ angular.module('ActiveResource').provider('ARMixin', function () {
         giver = new giver();
       }
       for (var i in giver) {
-        if (excludeFunctions) {
-          if (typeof giver[i] !== 'function') {
-            mixinProp();
-          }
-        } else {
-          mixinProp();
-        }
         function mixinProp() {
           if (!receiver.hasOwnProperty(i)) {
             (function () {
@@ -1073,6 +1076,13 @@ angular.module('ActiveResource').provider('ARMixin', function () {
             }());
             receiver[i] = giver[i];
           }
+        }
+        if (excludeFunctions) {
+          if (typeof giver[i] !== 'function') {
+            mixinProp();
+          }
+        } else {
+          mixinProp();
         }
       }
       return receiver;
@@ -1163,7 +1173,8 @@ angular.module('ActiveResource').provider('ARGET', function () {
     'ARAssociations',
     'ARHelpers',
     'URLify',
-    function ($http, deferred, Associations, Helpers, URLify) {
+    '$q',
+    function ($http, deferred, Associations, Helpers, URLify, $q) {
       function resolveSingleGET(data, terms, options) {
         if (data && data.length >= 1) {
           if (options.noInstanceEndpoint)
@@ -1227,12 +1238,6 @@ angular.module('ActiveResource').provider('ARGET', function () {
         return truth;
       }
       ;
-      function appendSlashForQueryString(url) {
-        if (url.slice(-1) == '/')
-          return url;
-        return url;
-      }
-      ;
       return function generateGET(instance, url, terms, options) {
         var instanceAndTerms = transformSearchTermsToForeignKeys(instance, terms);
         var associatedInstance, terms, propertyName;
@@ -1245,10 +1250,14 @@ angular.module('ActiveResource').provider('ARGET', function () {
         if (queryableByParams(url, terms)) {
           url = URLify(url, terms);
         } else if (Object.keys(terms).length) {
-          url = url.replace(/\:\w+/, '');
+          url = url.replace(/\/\:[a-zA-Z_]+/g, '').replace(/\:[a-zA-Z_]+/g, '');
           config.params = terms;
         }
-        url = appendSlashForQueryString(url);
+        if (options.api === false) {
+          var deferred = $q.defer();
+          deferred.resolve(options.cached);
+          return deferred.promise;
+        }
         return $http.get(url, config).then(function (response) {
           var data = response.data;
           if (propertyName && associatedInstance) {
@@ -1406,7 +1415,10 @@ angular.module('ActiveResource').provider('ARBase', function () {
             method = 'post';
           return $http[method](url, json).then(function (response) {
             return serializer.deserialize(response, instance).then(function (instance) {
-              _this.emit('$save:complete', instance);
+              _this.emit('$save:complete', {
+                data: response,
+                instance: instance
+              });
               return deferred(instance);
             });
           });
@@ -1423,6 +1435,10 @@ angular.module('ActiveResource').provider('ARBase', function () {
         // in-memory copy of the data, and does not attempt to persist the changes to the API.
         _this.prototype.$update = function (data) {
           var instance = this;
+          _this.emit('$update:called', {
+            instance: instance,
+            data: data
+          });
           var url = _this.api.updateURL;
           if (!url)
             return;
@@ -1503,7 +1519,6 @@ angular.module('ActiveResource').provider('ARBase', function () {
           return instance.$save().then(function (response) {
             instance = response;
             cacheInstance(instance);
-            _this.emit('$create:complete', instance);
             return deferred(instance);
           });
         };
@@ -1679,16 +1694,11 @@ angular.module('ActiveResource').provider('ARBase', function () {
           // Normalize variables
           if (typeof terms != 'object')
             throw 'Argument to where must be an object';
-          
-          defaults = {
-            lazy: false,
-            overEager: false
-          };
-          if (!options)
-            options = defaults;
-          else
-            options = _.merge(defaults, options);
-          
+          var defaults = {
+              lazy: false,
+              overEager: false
+            };
+          options = !options ? defaults : _.merge(defaults, options);
           var cached = _this.cached.where(terms);
           options.cached = cached;
           options.multi = true;
@@ -1756,12 +1766,19 @@ angular.module('ActiveResource').provider('ARBase', function () {
           // If no instance is found in the cache, generate a GET request, and return the
           // found instance, deserialized into the appropriate class
           if (cached !== undefined) {
-            _this.emit('find:complete', cached);
+            _this.emit('find:complete', {
+              instance: cached,
+              data: cached,
+              message: 'Backend not queried. Found in cache'
+            });
             return deferred(cached);
           } else {
             return GET(_this, url, terms, options).then(function (json) {
               var instance = _this.new(json);
-              _this.emit('find:complete', instance);
+              _this.emit('find:complete', {
+                instance: instance,
+                data: json
+              });
               return serializer.deserialize(json, instance, options);
             });
           }
@@ -1784,11 +1801,13 @@ angular.module('ActiveResource').provider('ARBase', function () {
           } else {
             config = { params: queryterms };
           }
-          url += '/';
           return $http.delete(url, config).then(function (response) {
             if (response.status == 200) {
               removeFromWatchedCollections(instance);
-              _this.emit('$delete:complete', instance);
+              _this.emit('$delete:complete', {
+                data: response,
+                instance: instance
+              });
               if (dependentDestroy.length >= 1)
                 return destroyDependents(instance);
               unlinkAssociations(instance);
