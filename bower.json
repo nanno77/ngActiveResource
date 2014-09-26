@@ -1,6 +1,6 @@
 {
   "name": "ActiveResource",
-  "version": "0.7.7.2",
+  "version": "0.7.7.3",
   "authors": [
     "Brett Shollenberger <brett.shollenberger@gmail.com>",
     "Nathanael Merrill <nathanael@wearebunker.com>"
@@ -15,7 +15,7 @@
     "tests"
   ],
   "dependencies": {
-    "active-support": "latest",
+    "active-support": "https://github.com/nanno77/ActiveSupport.js/archive/v0.1.2.zip",
     "angular": "latest",
     "lodash": "latest",
     "async": "~0.2.5",
