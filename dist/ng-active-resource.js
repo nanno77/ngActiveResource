@@ -938,7 +938,8 @@ angular.module('ActiveResource').provider('ARSerializer', function () {
       function updateLocalInstance(instance, response, options) {
         if (options && options.update == false)
           return deferred(instance);
-        // instance.update(response); //Disabled to help with sync issues
+        instance.update(response);
+        //Disabled to help with sync issues
         var primaryKey = Helpers.getPrimaryKeyFor(instance);
         instance.constructor.cached.cache(instance, primaryKey);
         instance.validations.updateInstance(instance);
